@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Script to process MKV files.
 # Removes unnecessary parts of the file.
