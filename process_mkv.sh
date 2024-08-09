@@ -5,14 +5,14 @@
 
 # Function to check if mkvtoolnix is installed
 check_mkvtoolnix_installed() {
-	if ! command -v mkvpropedit &>/dev/null; then
+	if ! command -v mkvmerge &>/dev/null || ! command -v mkvpropedit &>/dev/null; then
 		echo "mkvtoolnix is not installed. Please install it first."
 		exit 1
 	fi
 }
 
-# Function to remove attachments from an MKV file
-remove_attachments() {
+# Function to remove attachments and subtitles from an MKV file
+remove_attachments_and_subtitles() {
 	local file="$1"
 
 	# Check for attachments
@@ -32,9 +32,27 @@ remove_attachments() {
 			mkvpropedit "$file" --delete-attachment "$id"
 			echo "Removed attachment ID $id from '$file'."
 		done
-
-		echo "All attachments removed from '$file'."
 	fi
+
+	# Check for subtitle tracks
+	subtitle_tracks=$(mkvmerge -i "$file" | grep 'subtitles')
+
+	if [ -z "$subtitle_tracks" ]; then
+		echo "No subtitles found in '$file'."
+	else
+		echo "Subtitles found in '$file'. Removing them..."
+
+		# Create a new file without subtitle tracks
+		temp_file="${file%.mkv}_no_subtitles.mkv"
+		mkvmerge -o "$temp_file" --no-subtitles "$file"
+
+		# Replace the original file with the new one
+		mv "$temp_file" "$file"
+
+		echo "All subtitles removed from '$file'."
+	fi
+
+	echo "All attachments and subtitles removed from '$file'."
 }
 
 # Main script
@@ -49,7 +67,7 @@ main() {
 	for file in "$@"; do
 		if [[ "$file" == *.mkv ]]; then
 			if [ -f "$file" ]; then
-				remove_attachments "$file"
+				remove_attachments_and_subtitles "$file"
 			else
 				echo "File '$file' not found."
 			fi
