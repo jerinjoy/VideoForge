@@ -78,13 +78,22 @@ process_mkv_file() {
 		fi
 	fi
 
-	# Set the title to the name of the file
-	if [ "$dry_run" = true ]; then
-		echo "Would set the title of '$file' to '$title'."
+	# Get the current title
+	current_title=$(mkvinfo "$file" | grep 'Title' | awk -F: '{print $2}' | xargs)
+
+	# Update the title if it doesn't match the filename
+	if [ "$current_title" != "$title" ]; then
+		if [ "$dry_run" = true ]; then
+			echo "Would set the title of '$file' to '$title'."
+		else
+			mkvpropedit "$file" --edit info --set "title=$title"
+			echo "Set the title of '$file' to '$title'."
+		fi
 	else
-		mkvpropedit "$file" --edit info --set "title=$title"
-		echo "Set the title of '$file' to '$title'."
+		echo "The title of '$file' already matches the filename. No change needed."
 	fi
+
+	echo ""
 }
 
 # Main script
