@@ -2,6 +2,7 @@
 
 # Script to process MKV files.
 # Removes unnecessary parts of the file.
+# Written with Perplexity.ai
 
 # Function to check if mkvtoolnix is installed
 check_mkvtoolnix_installed() {
@@ -23,12 +24,10 @@ remove_attachments_and_subtitles() {
 	else
 		echo "Attachments found in '$file'. Removing them..."
 
-		# Extract attachment IDs and remove them
-		attachment_ids=$(echo "$attachments" | awk '{print $3}')
+		# Extract attachment IDs, sort them in descending order, and remove them
+		attachment_ids=$(echo "$attachments" | awk '{print $3}' | sed 's/://g' | sort -nr)
 
 		for id in $attachment_ids; do
-			# Remove trailing colon from the ID
-			id=${id%:}
 			mkvpropedit "$file" --delete-attachment "$id"
 			echo "Removed attachment ID $id from '$file'."
 		done
