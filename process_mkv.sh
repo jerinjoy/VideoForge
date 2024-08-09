@@ -26,11 +26,12 @@ check_mkvtoolnix_installed() {
 	fi
 }
 
-# Function to remove attachments and optionally subtitles from an MKV file
-remove_attachments_and_subtitles() {
+# Function to remove attachments, optionally subtitles, and set the title
+process_mkv_file() {
 	local file="$1"
 	local delete_subtitles="$2"
 	local dry_run="$3"
+	local title="${file%.mkv}"
 
 	# Check for attachments
 	attachments=$(mkvmerge -i "$file" | grep 'Attachment ID' || true)
@@ -77,6 +78,13 @@ remove_attachments_and_subtitles() {
 		fi
 	fi
 
+	# Set the title to the name of the file
+	if [ "$dry_run" = true ]; then
+		echo "Would set the title of '$file' to '$title'."
+	else
+		mkvpropedit "$file" --edit info --set "title=$title"
+		echo "Set the title of '$file' to '$title'."
+	fi
 }
 
 # Main script
@@ -122,7 +130,7 @@ main() {
 	fi
 
 	if [ -f "$file" ]; then
-		remove_attachments_and_subtitles "$file" "$delete_subtitles" "$dry_run"
+		process_mkv_file "$file" "$delete_subtitles" "$dry_run"
 	else
 		echo "File '$file' not found."
 		exit 1
