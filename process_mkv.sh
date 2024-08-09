@@ -4,6 +4,9 @@
 # Removes unnecessary parts of the file.
 # Written with Perplexity.ai
 
+# Exit immediately if a command exits with a non-zero status
+set -e
+
 # Function to check if mkvtoolnix is installed
 check_mkvtoolnix_installed() {
 	if ! command -v mkvmerge &>/dev/null || ! command -v mkvpropedit &>/dev/null; then
@@ -17,7 +20,7 @@ remove_attachments_and_subtitles() {
 	local file="$1"
 
 	# Check for attachments
-	attachments=$(mkvmerge -i "$file" | grep 'Attachment ID')
+	attachments=$(mkvmerge -i "$file" | grep 'Attachment ID' || true)
 
 	if [ -z "$attachments" ]; then
 		echo "No attachments found in '$file'."
@@ -34,7 +37,7 @@ remove_attachments_and_subtitles() {
 	fi
 
 	# Check for subtitle tracks
-	subtitle_tracks=$(mkvmerge -i "$file" | grep 'subtitles')
+	subtitle_tracks=$(mkvmerge -i "$file" | grep 'subtitles' || true)
 
 	if [ -z "$subtitle_tracks" ]; then
 		echo "No subtitles found in '$file'."
@@ -69,9 +72,11 @@ main() {
 				remove_attachments_and_subtitles "$file"
 			else
 				echo "File '$file' not found."
+				exit 1
 			fi
 		else
 			echo "'$file' is not an MKV file."
+			exit 1
 		fi
 	done
 }
