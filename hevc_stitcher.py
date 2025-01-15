@@ -295,12 +295,12 @@ def concatenate_and_encode(
     mismatched_files = verify_resolutions(input_dir, target_width, target_height)
     if mismatched_files:
         print(
-            f"\n{Colors.RED}Error: The following files don't match the target resolution "
+            f"\n{Colors.RED}Warning: The following files don't match the target resolution "
             + f"({target_width}x{target_height}):{Colors.END}"
         )
         for filename, (width, height) in mismatched_files:
             print(f"  - {filename}: {width}x{height}")
-        exit(1)
+        # exit(1)
 
     # Get sorted video files
     video_files = get_sorted_video_files(input_dir, sort_by)
