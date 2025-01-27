@@ -35,7 +35,8 @@ process_mkv_file() {
     local dry_run="$4"
     local title="${file%.mkv}"
     local needs_audio_processing=false
-    local audio_options=""
+    local audio_tracks_to_keep=""
+    local found_target_language=false
 
     # List all tracks in the file
     echo "Tracks in '$file':"
@@ -81,15 +82,20 @@ process_mkv_file() {
         current_id=""
         current_type=""
         current_lang=""
+        audio_tracks_to_keep=""
+        found_target_language=false
 
-        # Second pass: process audio tracks
         while IFS= read -r line; do
             if [[ $line == *"Track number:"* ]]; then
                 if [ "$current_type" = "audio" ]; then
                     if [ "$current_lang" = "$keep_language" ]; then
-                        # Use -a for audio track selection
-                        audio_options="-a ${current_id}"
-                        needs_audio_processing=true
+                        # Append track ID to the list of tracks to keep
+                        if [ -z "$audio_tracks_to_keep" ]; then
+                            audio_tracks_to_keep="$current_id"
+                        else
+                            audio_tracks_to_keep="$audio_tracks_to_keep,$current_id"
+                        fi
+                        found_target_language=true
                         echo "Found $keep_language audio track (ID: $current_id) - will keep"
                     else
                         echo "Found non-$keep_language audio track (ID: $current_id) - will be removed"
@@ -107,12 +113,15 @@ process_mkv_file() {
         # Process last track if it's audio
         if [ "$current_type" = "audio" ]; then
             if [ "$current_lang" = "$keep_language" ]; then
-                # Use --audio-tracks for audio track selection
-                audio_options="--audio-tracks ${current_id}"
-                needs_audio_processing=true
+                if [ -z "$audio_tracks_to_keep" ]; then
+                    audio_tracks_to_keep="$current_id"
+                else
+                    audio_tracks_to_keep="$audio_tracks_to_keep,$current_id"
+                fi
+                found_target_language=true
                 echo "Found $keep_language audio track (ID: $current_id) - will keep"
             else
-                    echo "Found non-$keep_language audio track (ID: $current_id) - will be removed"
+                echo "Found non-$keep_language audio track (ID: $current_id) - will be removed"
                 needs_audio_processing=true
             fi
         fi
@@ -125,12 +134,12 @@ process_mkv_file() {
             else
                 echo "Processing audio tracks..."
                 temp_file="${file%.mkv}_${keep_language}.mkv"
-                if [ -z "$audio_options" ]; then
+                if [ "$found_target_language" = false ]; then
                     echo "Warning: No $keep_language audio tracks found. Keeping all audio tracks."
                 else
-                    # Construct the command using track selection syntax
-                    cmd="mkvmerge -o \"$temp_file\" --video-tracks 0 $audio_options \"$file\""
-                    # echo "DEBUG: mkvmerge command: $cmd"
+                    # Construct the command using consistent --audio-tracks syntax
+                    cmd="mkvmerge -o \"$temp_file\" --video-tracks 0 --audio-tracks $audio_tracks_to_keep \"$file\""
+                    echo "Executing: $cmd"
                     eval "$cmd"
                     if [ $? -eq 0 ] && [ -s "$temp_file" ]; then
                         # Check if the output file is reasonable (at least 50% of original size)
