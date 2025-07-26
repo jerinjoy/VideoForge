@@ -53,7 +53,9 @@ def parse_tracks(mkv_file: str) -> list[Track]:
             if current_track['track_id']:
                 tracks.append(Track(**current_track))
                 current_track = {'track_id': '', 'track_type': '', 'language': 'undefined', 'codec': ''}
-            current_track['track_id'] = line.split('mkvextract:')[1].strip()
+            # Extract track ID from format: "Track number: 1 (track ID for mkvmerge & mkvextract: 0)"
+            track_id_match = line.split('mkvextract:')[1].strip()
+            current_track['track_id'] = track_id_match.rstrip(')')
         elif '|  + Track type:' in line:
             current_track['track_type'] = line.split(':')[1].strip()
         elif '|  + Codec ID:' in line:
@@ -85,30 +87,41 @@ def process_mkv_file(file: str, delete_subtitles: bool, keep_language: Optional[
         print(f"Analyzing audio tracks in '{file}'...")
         audio_tracks = [t for t in tracks if t.type == 'audio']
         target_tracks = [t for t in audio_tracks if t.language == keep_language]
+        non_target_tracks = [t for t in audio_tracks if t.language != keep_language]
 
-        if not target_tracks and audio_tracks:
-            print(f"Warning: No {keep_language} audio tracks found. Keeping all audio tracks.")
-        elif audio_tracks:
-            audio_track_ids = ','.join(t.track_id for t in target_tracks)
-            if dry_run:
-                print(f"Would keep only {keep_language} audio tracks in '{file}'.")
+        # Show which tracks will be kept/removed
+        for track in target_tracks:
+            print(f"Found {keep_language} audio track (ID: {track.track_id}) - will keep")
+        for track in non_target_tracks:
+            print(f"Found non-{keep_language} audio track (ID: {track.track_id}) - will be removed")
+
+        # Only process if there are non-target language tracks to remove
+        if non_target_tracks:
+            if not target_tracks:
+                print(f"Warning: No {keep_language} audio tracks found. Keeping all audio tracks.")
             else:
-                temp_file = f"{os.path.splitext(file)[0]}_{keep_language}.mkv"
-                cmd = ['mkvmerge', '-o', temp_file, '--video-tracks', '0',
-                      '--audio-tracks', audio_track_ids, file]
-                run_command(cmd)
-
-                # Check output file size
-                original_size = os.path.getsize(file)
-                new_size = os.path.getsize(temp_file)
-
-                if new_size > original_size / 2:
-                    os.replace(temp_file, file)
-                    print(f"Kept only {keep_language} audio tracks in '{file}'.")
+                audio_track_ids = ','.join(t.track_id for t in target_tracks)
+                if dry_run:
+                    print(f"Would keep only {keep_language} audio tracks in '{file}'.")
                 else:
-                    print("Error: Output file is suspiciously small. Operation aborted.")
-                    os.remove(temp_file)
-                    sys.exit(1)
+                    temp_file = f"{os.path.splitext(file)[0]}_{keep_language}.mkv"
+                    cmd = ['mkvmerge', '-o', temp_file, '--video-tracks', '0',
+                          '--audio-tracks', audio_track_ids, file]
+                    run_command(cmd)
+
+                    # Check output file size
+                    original_size = os.path.getsize(file)
+                    new_size = os.path.getsize(temp_file)
+
+                    if new_size > original_size / 2:
+                        os.replace(temp_file, file)
+                        print(f"Kept only {keep_language} audio tracks in '{file}'.")
+                    else:
+                        print("Error: Output file is suspiciously small. Operation aborted.")
+                        os.remove(temp_file)
+                        sys.exit(1)
+        else:
+            print("No audio track changes needed.")
 
     # Process subtitles if requested
     if delete_subtitles:
